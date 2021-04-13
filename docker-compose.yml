@@ -1,0 +1,14 @@
+version: "3.5"
+services:
+  cardano-graphql-helper:
+    build:
+      context: .
+    container_name: cardano-graphql-helper
+    ports:
+      - 8099:8080
+    restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"

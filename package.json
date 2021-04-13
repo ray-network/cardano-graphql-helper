@@ -1,0 +1,13 @@
+{
+  "name": "cardano-graphql-helper",
+  "version": "1.0.0",
+  "description": "",
+  "author": "Ray Robot <hello@rraayy.com>",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.16.1"
+  }
+}
