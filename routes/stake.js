@@ -34,15 +34,13 @@ router.get('/stake/:account', async (req, res) => {
     `,
     [accountDbId]
   )
-  const rewardsAmount = rewardsAmountQuery.rows.length > 0 ? `${parseInt(rewardsAmountQuery.rows[0].remainingRewards, 10)}` : '0'
+  const rewardsAmount = rewardsAmountQuery.rows.length > 0 ? parseInt(rewardsAmountQuery.rows[0].remainingRewards, 10) : 0
 
   // rewards history
   const rewardsHistoryQuery = await db.query(`
   SELECT
     r.epoch_no::INTEGER as "forDelegationInEpoch", block.epoch_no as "epochNo",
-    block.time, r.amount,
-    -- RIGHT(ph.hash_raw::text, -2) as "poolId",
-    ph.view as "poolId", 'REGULAR' as "rewardType"
+    block.time, r.amount::INTEGER, ph.view as "poolId", 'REGULAR' as "rewardType"
     FROM reward r
       LEFT JOIN block ON r.block_id=block.id
       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
@@ -55,7 +53,6 @@ router.get('/stake/:account', async (req, res) => {
   // current pool
   const currentPoolQuery = await db.query(
     `SELECT
-      -- d.pool_hash_id AS "poolHashDbId", pr.retiring_epoch AS "retiringEpoch",
       ph.view as "poolId"
       FROM delegation AS d
         LEFT JOIN tx ON d.tx_id=tx.id
@@ -93,7 +90,9 @@ router.get('/stake/:account', async (req, res) => {
   const hasStakingKey = latestRegistrationBlock > latestDeregistrationBlock
 
   // current epoch
-  const currentEpochQuery = await db.query('SELECT no FROM epoch ORDER BY no desc limit 1')
+  const currentEpochQuery = await db.query(`
+    SELECT no FROM epoch ORDER BY no desc limit 1
+  `)
   const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
 
   // next rewards
@@ -102,8 +101,8 @@ router.get('/stake/:account', async (req, res) => {
       .map(epoch => ({ epoch }))
 
   const rawEpochDelegations = await db.query(`
-    SELECT DISTINCT ON (block.epoch_no) block.epoch_no as "epochNo",
-      -- d.pool_hash_id as "poolHashDbId"
+    SELECT
+      DISTINCT ON (block.epoch_no) block.epoch_no as "epochNo",
       ph.view as "poolId"
       FROM delegation d
         LEFT JOIN tx ON tx.id=d.tx_id
