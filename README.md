@@ -6,4 +6,5 @@ Works together with the `cardano-db-sync-extended` default configuration.
  
 ### run
 
-`docker-compose up -d`
+1. copy `.env.example` to `.env`
+2. `docker-compose up -d`
