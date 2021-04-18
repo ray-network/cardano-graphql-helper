@@ -1,5 +1,5 @@
-const account = require('./account')
+const stake = require('./stake')
 
 module.exports = app => {
-  app.use('/account', account)
+  app.use('/account', stake)
 }
