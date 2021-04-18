@@ -7,8 +7,6 @@ services:
     container_name: cardano-graphql-helper
     ports:
       - 8099:8080
-    expose:
-      - 5432
     networks:
       - cardano-graphql
     restart: on-failure
