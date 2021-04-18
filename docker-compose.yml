@@ -1,4 +1,5 @@
 version: "3.5"
+
 services:
   cardano-graphql-helper:
     build:
@@ -6,9 +7,17 @@ services:
     container_name: cardano-graphql-helper
     ports:
       - 8099:8080
+    expose:
+      - 5432
+    networks:
+      - cardano-graphql
     restart: on-failure
     logging:
       driver: "json-file"
       options:
         max-size: "200k"
         max-file: "10"
+
+networks:
+  cardano-graphql:
+    name: cardano-graphql-4-0-stable_default
