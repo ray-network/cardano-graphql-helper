@@ -7,4 +7,5 @@ Works together with the `cardano-db-sync-extended` default configuration.
 ### run
 
 1. copy `.env.example` to `.env`
-2. `docker-compose up -d`
+2. replace network name in `docker-compose.yml` with cardano-graphql setup, to find yours use `docker network ls`
+3. `docker-compose up -d`
