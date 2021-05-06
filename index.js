@@ -8,12 +8,15 @@ const mountRoutes = require('./routes')
 const PORT = 8080;
 const HOST = '0.0.0.0';
 const allowedOrigins = [
+  'https://distribution.rraayy.com',
   'https://raywallet.io',
   'http://localhost:3000',
 ]
 
 // App
-const app = express();
+const app = express()
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
 app.use(cors({
   origin: function (origin, callback) {

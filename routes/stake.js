@@ -34,6 +34,7 @@ router.get('/stake/:account', async (req, res) => {
     `,
     [accountDbId]
   )
+
   const rewardsAmount = rewardsAmountQuery.rows.length > 0 ? parseInt(rewardsAmountQuery.rows[0].remainingRewards, 10) : 0
 
   // rewards history
@@ -97,7 +98,7 @@ router.get('/stake/:account', async (req, res) => {
 
   // next rewards
   const getEmptyRewardsArray = (currentEpoch) =>
-    range(currentEpoch - 3, currentEpoch + 1)
+    range(currentEpoch - 1, currentEpoch + 1)
       .map(epoch => ({ epoch }))
 
   const rawEpochDelegations = await db.query(`
@@ -117,7 +118,7 @@ router.get('/stake/:account', async (req, res) => {
 
   const getRewardObject = (epoch, poolId) => {
     const firstDelegationEpochWithRewards = 209
-    const diff = epoch - firstDelegationEpochWithRewards
+    const diff = epoch - firstDelegationEpochWithRewards - 2
     return {
       forEpoch: epoch,
       rewardDate: moment.utc('2020-08-23 21:44:00').add(diff * 5, 'days').format(),
