@@ -131,7 +131,7 @@ router.get('/stake/:account', async (req, res) => {
       return getEmptyRewardsArray(currentEpoch)
     }
     let i = epochDelegations.length - 1
-    const currentlyRewardedEpoch = currentEpoch - 3
+    const currentlyRewardedEpoch = currentEpoch - 2
     while (i > 0 && epochDelegations[i - 1].epochNo <= currentlyRewardedEpoch) { i -= 1 }
     const nextReward = epochDelegations[i]
     epochDelegations[i].epochNo = Math.max(currentlyRewardedEpoch, nextReward.epochNo)
