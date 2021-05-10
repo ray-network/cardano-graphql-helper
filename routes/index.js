@@ -1,7 +1,7 @@
 const stake = require('./stake')
-// const pools = require('./pools')
+const rewards = require('./rewards')
 
 module.exports = app => {
   app.use('/account', stake)
-  // app.use('/pools', pools)
+  app.use('/rewards', rewards)
 }
