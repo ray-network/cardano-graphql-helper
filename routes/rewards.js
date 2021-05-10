@@ -26,7 +26,7 @@ router.get('/ray/:stakeKey', async (req, res) => {
       LEFT JOIN pool_hash ph ON es.pool_id=ph.id
       WHERE es.addr_id=$1 AND ph.view=$2 AND es.epoch_no NOT IN ($3-1, $3)
       ORDER BY block.slot_no DESC`,
-    [accountDbId, 'pool1d03p2xfdcq09efx0hgy4jkr0tqdgvklues5cg3ud45t9wndafmm', currentEpoch]
+    [accountDbId, 'pool1rjxdqghfjw5rv6lxg8qhedkechvfgnsqhl8rrzwck9g45n43yql', currentEpoch]
   )
   const rewardsHistory = rewardsHistoryQuery.rows.map(item => {
     return {
