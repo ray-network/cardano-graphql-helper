@@ -19,8 +19,8 @@ router.get('/ray/:stakeKey', async (req, res) => {
 
   const rewardsHistoryQuery = await db.query(`
   SELECT
-    es.epoch_no::INTEGER as "forDelegationInEpoch", block.epoch_no as "epochNo",
-    block.time, es.amount::INTEGER, ph.view as "poolId", 'REGULAR' as "rewardType"
+    es.epoch_no::BIGINT as "forDelegationInEpoch", block.epoch_no as "epochNo",
+    block.time, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
     FROM epoch_stake es
       LEFT JOIN block ON es.block_id=block.id
       LEFT JOIN pool_hash ph ON es.pool_id=ph.id
