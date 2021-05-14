@@ -8,9 +8,11 @@ const mountRoutes = require('./routes')
 const PORT = 8080;
 const HOST = '0.0.0.0';
 const allowedOrigins = [
-  'https://distribution.rraayy.com',
+  'https://x.rraayy.com',
+  'https://stats.rraayy.com',
   'https://raywallet.io',
   'http://localhost:3000',
+  'http://localhost:8000',
 ]
 
 // App
