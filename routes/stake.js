@@ -6,13 +6,13 @@ const moment = require('moment')
 
 module.exports = router
 
-router.get('/stake/:account', async (req, res) => {
-  const { account } = req.params
+router.get('/state/:stakeKey', async (req, res) => {
+  const { stakeKey } = req.params
 
   // accountDbId
   const { rows: accountDbResult } = await db.query(
-    'SELECT id as "accountDbId" from stake_address WHERE hash_raw=$1',
-    [`\\x${account}`]
+    'SELECT id as "accountDbId" from stake_address WHERE view=$1',
+    [stakeKey]
   )
   const accountDbId = accountDbResult.length > 0 ? accountDbResult[0].accountDbId : '-1'
 
@@ -91,9 +91,7 @@ router.get('/stake/:account', async (req, res) => {
   const hasStakingKey = latestRegistrationBlock > latestDeregistrationBlock
 
   // current epoch
-  const currentEpochQuery = await db.query(`
-    SELECT no FROM epoch ORDER BY no desc limit 1
-  `)
+  const currentEpochQuery = await db.query(`SELECT no FROM epoch ORDER BY no desc limit 1`)
   const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
 
   // next rewards

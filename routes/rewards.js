@@ -1,46 +1,220 @@
 const Router = require('express-promise-router')
+const { range, max } = require('lodash')
 const db = require('../db')
 const router = new Router()
 
 module.exports = router
 
-router.get('/ray/:stakeKey', async (req, res) => {
-  const { stakeKey } = req.params
+const pools = [
+  'pool1rjxdqghfjw5rv6lxg8qhedkechvfgnsqhl8rrzwck9g45n43yql',
+]
 
-  // accountDbId
-  const { rows: accountDbResult } = await db.query(
-    'SELECT id as "accountDbId" from stake_address WHERE view=$1',
-    [stakeKey]
-  )
-  const accountDbId = accountDbResult.length > 0 ? accountDbResult[0].accountDbId : '-1'
+// const pools = [
+//   'pool15sfcpy4tps5073gmra0e6tm2dgtrn004yr437qmeh44sgjlg2ex',
+//   'pool1d03p2xfdcq09efx0hgy4jkr0tqdgvklues5cg3ud45t9wndafmm',
+//   'pool1tzmx7k40sm8kheam3pr2d4yexrp3jmv8l50suj6crnvn6dc2429',
+// ]
+
+const startEpoch = 235
+const cutoffEpoch = 275
+const endEpoch = 500
+const totalRewards = 100000000
+const earlyBonus = 1538200
+const maxStart = 444444
+const decreaseRatio = 0.00444
+const startRate = 50000000
+const epochsRange = range(startEpoch, endEpoch + 1)
+
+const calculateAmountWithDescrease = (amount, epoch, rewardsPerEpochs) => {
+  const diff = epoch - cutoffEpoch
+  const coeff = diff >= 0 ? diff : 0
+  const maxRewardsCalc = parseInt(maxStart - maxStart * decreaseRatio * coeff, 10)
+  const maxRewards = maxRewardsCalc > 0 ? maxRewardsCalc : 0
+
+  const fromEpochs = rewardsPerEpochs.filter(item => item.epochNo === epoch)
+  const fromEpoch = fromEpochs.length > 0 ? fromEpochs[0] : {}
+  const fromEpochAmount = fromEpoch.amount || 0
+
+  let ratio = 1
+  if (maxRewards > 0) {
+    const newRate = fromEpochAmount / maxRewards
+    if (newRate > startRate) {
+      ratio = fromEpochAmount / maxRewards / startRate
+    }
+  }
+
+  const rate = startRate * ratio
+  const isAvailable = epoch < endEpoch && maxRewards > 0
+  const result = isAvailable
+    ? [Math.floor(amount / rate), Math.round(rate)]
+    : [0, 0]
+
+  return result
+}
+
+const getEpochData = (data, epoch) => {
+  const arr = data.filter(item => item.epochNo === epoch)
+  return arr.length > 0 ? arr[0] : {}
+}
+
+router.get('/delegation/state', async (req, res) => {
 
   const currentEpochQuery = await db.query('SELECT no FROM epoch ORDER BY no desc limit 1')
   const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
 
-  const rewardsHistoryQuery = await db.query(`
-  SELECT
-    es.epoch_no::BIGINT as "forDelegationInEpoch", block.epoch_no as "epochNo",
-    block.time, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
-    FROM epoch_stake es
-      LEFT JOIN block ON es.block_id=block.id
-      LEFT JOIN pool_hash ph ON es.pool_id=ph.id
-      WHERE es.addr_id=$1 AND ph.view=$2 AND es.epoch_no NOT IN ($3-1, $3)
-      ORDER BY block.slot_no DESC`,
-    [accountDbId, 'pool1rjxdqghfjw5rv6lxg8qhedkechvfgnsqhl8rrzwck9g45n43yql', currentEpoch]
+  const { rows: rewardsHistoryForEpochs } = await db.query(`
+    SELECT
+      es.epoch_no::BIGINT as "forDelegationInEpoch", block.epoch_no as "epochNo",
+      block.time, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      FROM epoch_stake es
+        LEFT JOIN block ON es.block_id=block.id
+        LEFT JOIN pool_hash ph ON es.pool_id=ph.id
+        WHERE ph.view = ANY ($1)
+        ORDER BY block.slot_no DESC
+    `,
+    [pools]
   )
-  const rewardsHistory = rewardsHistoryQuery.rows.map(item => {
+
+  const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, amount }) => {
+    acc[epochNo] = {
+      epochNo,
+      amount: (acc[epochNo] ? parseInt(acc[epochNo].amount) : 0) + parseInt(amount)
+    }
+    return acc
+  }, {}))
+
+
+  const decreaseGraph = {}
+  epochsRange.forEach(epoch => {
+    const diff = epoch - cutoffEpoch
+    const coeff = diff >= 0 ? diff : 0
+    const maxRewardsCalc = parseInt(maxStart - maxStart * decreaseRatio * coeff, 10)
+    const maxRewards = maxRewardsCalc > 0 ? maxRewardsCalc : 0
+
+    decreaseGraph[epoch] = maxRewards
     return {
-      ...item,
-      epochNo: item.epochNo + 2,
-      amount: parseInt(item.amount / 1000000 / 50)
+      [epoch]: maxRewards,
     }
   })
 
-  const total = rewardsHistory.reduce((n, { amount }) => n + amount, 0)
+  const distributed = epochsRange
+    .map(epoch => {
+      const distr = getEpochData(rewardsPerEpochs, epoch)
+      const rewards = calculateAmountWithDescrease(distr.amount, epoch, rewardsPerEpochs)
+      return {
+        epoch: epoch,
+        total: distr.amount || 0,
+        xray: rewards[0] || 0,
+        rate: rewards[1] || 0,
+        maxRewards: decreaseGraph[epoch]
+      }
+    })
+
+  const totalAccrued = distributed.reduce((n, { xray }) => n + xray, 0)
+  const totalUndelivered = totalRewards - totalAccrued
 
   res.send({
-    stakeKey,
+    currentEpoch,
+    totalAccrued,
+    totalUndelivered,
+    distributed,
+  })
+})
+
+router.get('/delegation/state/:search', async (req, res) => {
+  const { search } = req.params
+
+  // accountDbId
+  let accountDbId = ''
+  let isAddress = false
+  if (search.startsWith('addr1')) {
+    isAddress = true
+    const { rows: stakeAddressDbResult } = await db.query(
+      `SELECT stake_address_id FROM tx_out WHERE address=$1 limit 1`,
+      [search]
+    )
+    accountDbId = stakeAddressDbResult.length > 0 ? stakeAddressDbResult[0].stake_address_id : '-1'
+  } else {
+    const { rows: accountDbResult } = await db.query(
+      'SELECT id as "accountDbId" from stake_address WHERE view=$1',
+      [search]
+    )
+    accountDbId = accountDbResult.length > 0 ? accountDbResult[0].accountDbId : '-1'
+  }
+
+  const currentEpochQuery = await db.query('SELECT no FROM epoch ORDER BY no desc limit 1')
+  const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
+
+  const { rows: rewardsHistoryForAccount } = await db.query(`
+    SELECT
+      es.epoch_no::BIGINT as "forDelegationInEpoch",
+      block.time, block.id, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      FROM epoch_stake es
+        LEFT JOIN block ON es.block_id=block.id
+        LEFT JOIN pool_hash ph ON es.pool_id=ph.id
+        WHERE ph.view = ANY ($1) AND es.addr_id=$2
+        ORDER BY block.slot_no DESC`,
+    [pools, accountDbId]
+  )
+
+  const { rows: rewardsHistoryForEpochs } = await db.query(`
+    SELECT
+      es.epoch_no::BIGINT as "forDelegationInEpoch", block.epoch_no as "epochNo",
+      block.time, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      FROM epoch_stake es
+        LEFT JOIN block ON es.block_id=block.id
+        LEFT JOIN pool_hash ph ON es.pool_id=ph.id
+        WHERE ph.view = ANY ($1)
+        ORDER BY block.slot_no DESC
+    `,
+    [pools]
+  )
+
+  const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, amount }) => {
+    acc[epochNo] = {
+      epochNo,
+      amount: (acc[epochNo] ? parseInt(acc[epochNo].amount, 10) : 0) + parseInt(amount, 10)
+    }
+    return acc
+  }, {}))
+
+  const rewardsHistory = rewardsHistoryForAccount.map(item => {
+    const tokens = calculateAmountWithDescrease(parseInt(item.amount, 10), parseInt(item.forDelegationInEpoch, 10), rewardsPerEpochs)
+    return {
+      ...item,
+      amount: tokens[0],
+      perXray: tokens[1],
+      snapshot: parseInt(item.amount, 10),
+    }
+  })
+  const total = rewardsHistory.reduce((n, { amount }) => n + amount, 0)
+
+  const distributed = []
+  epochsRange
+    .forEach(epoch => {
+      const distr = getEpochData(rewardsPerEpochs, epoch)
+      const rewards = calculateAmountWithDescrease(distr.amount, epoch, rewardsPerEpochs)
+      // if (epoch > cutoffEpoch) return
+      distributed.push({
+        epoch: epoch,
+        total: distr.amount || 0,
+        xray: rewards[0] || 0,
+        rate: rewards[1] || 0,
+      })
+    })
+
+  const totalAccrued = distributed.reduce((n, { xray }) => n + xray, 0)
+  const totalEarlyBonus = Math.floor(total / totalAccrued * earlyBonus)
+  const totalEarlyShare = (total / totalAccrued).toFixed(4)
+
+  res.send({
+    found: !(parseInt(accountDbId) < 0),
+    isAddress,
+    search,
     total,
+    totalEarlyBonus,
+    totalEarlyShare,
     rewardsHistory,
+    currentEpoch,
   })
 })
