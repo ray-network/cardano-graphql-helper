@@ -1,5 +1,5 @@
 const Router = require('express-promise-router')
-const { range, max } = require('lodash')
+const { range } = require('lodash')
 const db = require('../db')
 const router = new Router()
 
@@ -25,7 +25,7 @@ const decreaseRatio = 0.00444
 const startRate = 50000000
 const epochsRange = range(startEpoch, endEpoch + 1)
 
-const calculateAmountWithDescrease = (amount, epoch, rewardsPerEpochs) => {
+const calculateAmountWithDescrease = (amount, epoch, rewardsPerEpochs, currentEpoch) => {
   const diff = epoch - cutoffEpoch
   const coeff = diff >= 0 ? diff : 0
   const maxRewardsCalc = parseInt(maxStart - maxStart * decreaseRatio * coeff, 10)
@@ -44,7 +44,7 @@ const calculateAmountWithDescrease = (amount, epoch, rewardsPerEpochs) => {
   }
 
   const rate = startRate * ratio
-  const isAvailable = epoch < endEpoch && maxRewards > 0
+  const isAvailable = epoch < endEpoch && maxRewards > 0 && epoch <= currentEpoch
   const result = isAvailable
     ? [Math.floor(amount / rate), Math.round(rate)]
     : [0, 0]
@@ -97,15 +97,19 @@ router.get('/delegation/state', async (req, res) => {
     }
   })
 
+  let maxLimit = 0
   const distributed = epochsRange
     .map(epoch => {
       const distr = getEpochData(rewardsPerEpochs, epoch)
-      const rewards = calculateAmountWithDescrease(distr.amount, epoch, rewardsPerEpochs)
+      const rewards = calculateAmountWithDescrease(distr.amount, epoch, rewardsPerEpochs, currentEpoch)
+      maxLimit = maxLimit + (rewards[0] || 0)
+      const exceed = maxLimit > totalRewards
+
       return {
         epoch: epoch,
-        total: distr.amount || 0,
-        xray: rewards[0] || 0,
-        rate: rewards[1] || 0,
+        total: !exceed ? distr.amount || 0 : 0,
+        xray: !exceed ? rewards[0] || 0 : 0,
+        rate: !exceed ? rewards[1] || 0 : 0,
         maxRewards: decreaseGraph[epoch]
       }
     })
@@ -178,32 +182,46 @@ router.get('/delegation/state/:search', async (req, res) => {
     return acc
   }, {}))
 
-  const rewardsHistory = rewardsHistoryForAccount.map(item => {
-    const tokens = calculateAmountWithDescrease(parseInt(item.amount, 10), parseInt(item.forDelegationInEpoch, 10), rewardsPerEpochs)
-    return {
-      ...item,
-      amount: tokens[0],
-      perXray: tokens[1],
-      snapshot: parseInt(item.amount, 10),
-    }
-  })
-  const total = rewardsHistory.reduce((n, { amount }) => n + amount, 0)
 
   const distributed = []
+  let xrayTotal = 0
   epochsRange
     .forEach(epoch => {
       const distr = getEpochData(rewardsPerEpochs, epoch)
-      const rewards = calculateAmountWithDescrease(distr.amount, epoch, rewardsPerEpochs)
-      // if (epoch > cutoffEpoch) return
+      const rewards = calculateAmountWithDescrease(distr.amount, epoch, rewardsPerEpochs, currentEpoch)
+      xrayTotal = xrayTotal + rewards[0]
+
       distributed.push({
         epoch: epoch,
         total: distr.amount || 0,
         xray: rewards[0] || 0,
         rate: rewards[1] || 0,
+        xrayTotal,
       })
     })
 
+  const xrayDistributed = {}
+  distributed.forEach(item => {
+    xrayDistributed[item.epoch] = {
+      xrayTotal: item.xrayTotal,
+    }
+  })
+
+  const rewardsHistory = rewardsHistoryForAccount.map(item => {
+    const epoch = parseInt(item.forDelegationInEpoch, 10)
+    const tokens = calculateAmountWithDescrease(parseInt(item.amount, 10), epoch, rewardsPerEpochs, currentEpoch)
+    const isAvailable = xrayDistributed[epoch].xrayTotal < totalRewards
+
+    return {
+      ...item,
+      amount: isAvailable ? tokens[0] || 0 : 0,
+      perXray: isAvailable ? tokens[1] || 0 : 0,
+      snapshot: isAvailable ? parseInt(item.amount, 10) : 0,
+    }
+  })
+
   const totalAccrued = distributed.reduce((n, { xray }) => n + xray, 0)
+  const total = rewardsHistory.reduce((n, { amount }) => n + amount, 0)
   const totalEarlyBonus = Math.floor(total / totalAccrued * earlyBonus)
   const totalEarlyShare = (total / totalAccrued).toFixed(4)
 
