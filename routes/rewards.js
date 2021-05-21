@@ -20,7 +20,7 @@ const cutoffEpoch = 275
 const endEpoch = 500
 const totalRewards = 100000000
 const earlyBonus = 1538200
-const maxStart = 444444
+const maxStart = 888888
 const decreaseRatio = 0.00444
 const startRate = 50000000
 const epochsRange = range(startEpoch, endEpoch + 1)
@@ -90,8 +90,8 @@ router.get('/delegation/state', async (req, res) => {
     const coeff = diff >= 0 ? diff : 0
     const maxRewardsCalc = parseInt(maxStart - maxStart * decreaseRatio * coeff, 10)
     const maxRewards = maxRewardsCalc > 0 ? maxRewardsCalc : 0
-
     decreaseGraph[epoch] = maxRewards
+
     return {
       [epoch]: maxRewards,
     }
@@ -110,7 +110,7 @@ router.get('/delegation/state', async (req, res) => {
         total: !exceed ? distr.amount || 0 : 0,
         xray: !exceed ? rewards[0] || 0 : 0,
         rate: !exceed ? rewards[1] || 0 : 0,
-        maxRewards: decreaseGraph[epoch]
+        maxRewards: !exceed ? decreaseGraph[epoch] : 0,
       }
     })
 
