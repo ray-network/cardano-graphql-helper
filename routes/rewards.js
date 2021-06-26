@@ -5,21 +5,26 @@ const router = new Router()
 
 module.exports = router
 
-const pools = [
-  'pool1rjxdqghfjw5rv6lxg8qhedkechvfgnsqhl8rrzwck9g45n43yql',
-  'pool1ntfxj2jgvhzen8e86ed679ctukar3vj538ywyyq8ryld66jj4sx',
-  'pool1yt868wrp9s2x5pehe96del9m3nwasme62yw02vww3kg6zwzspcz',
-]
-
 // const pools = [
 //   'pool15sfcpy4tps5073gmra0e6tm2dgtrn004yr437qmeh44sgjlg2ex',
 //   'pool1d03p2xfdcq09efx0hgy4jkr0tqdgvklues5cg3ud45t9wndafmm',
 //   'pool1tzmx7k40sm8kheam3pr2d4yexrp3jmv8l50suj6crnvn6dc2429',
 // ]
 
+// const startEpoch = 100
+// const cutoffEpoch = 130
+// const endEpoch = 500
+
+const pools = [
+  'pool1rjxdqghfjw5rv6lxg8qhedkechvfgnsqhl8rrzwck9g45n43yql',
+  'pool1ntfxj2jgvhzen8e86ed679ctukar3vj538ywyyq8ryld66jj4sx',
+  'pool1yt868wrp9s2x5pehe96del9m3nwasme62yw02vww3kg6zwzspcz',
+]
+
 const startEpoch = 235
 const cutoffEpoch = 275
 const endEpoch = 500
+
 const totalRewards = 100000000
 const earlyBonus = 1538200
 const maxStart = 888888
