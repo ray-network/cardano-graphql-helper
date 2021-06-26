@@ -18,4 +18,4 @@ services:
 
 networks:
   cardano-graphql:
-    name: cardano-graphql-4-0-stable_default
+    name: cardano-graphql_default
