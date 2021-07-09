@@ -23,6 +23,7 @@ const pools = [
 
 const startEpoch = 235
 const cutoffEpoch = 275
+const cutoffEpochEarly = 277
 const endEpoch = 500
 
 const totalRewards = 100000000
@@ -227,10 +228,18 @@ router.get('/delegation/state/:search', async (req, res) => {
     }
   })
 
-  const totalAccrued = distributed.reduce((n, { xray }) => n + xray, 0)
+  const totalAccruedToDelegators = distributed.reduce((n, { xray }) => n + xray, 0)
   const total = rewardsHistory.reduce((n, { amount }) => n + amount, 0)
-  const totalEarlyBonus = Math.floor(total / totalAccrued * earlyBonus)
-  const totalEarlyShare = (total / totalAccrued).toFixed(4)
+
+  const totalAccruedInEarly = distributed
+    .filter(distr => distr.epoch <= cutoffEpochEarly)
+    .reduce((n, { xray }) => n + xray, 0)
+  const totalInEarly = rewardsHistory
+    .filter(distr => parseInt(distr.forDelegationInEpoch, 10) <= cutoffEpochEarly)
+    .reduce((n, { amount }) => n + amount, 0)
+
+  const totalEarlyBonus = Math.floor(totalInEarly / totalAccruedInEarly * earlyBonus)
+  const totalEarlyShare = (totalInEarly / totalAccruedInEarly).toFixed(4)
 
   res.send({
     found: !(parseInt(accountDbId) < 0),
@@ -241,5 +250,6 @@ router.get('/delegation/state/:search', async (req, res) => {
     totalEarlyShare,
     rewardsHistory,
     currentEpoch,
+    totalAccruedToDelegators,
   })
 })
