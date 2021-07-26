@@ -40,13 +40,12 @@ router.get('/state/:stakeKey', async (req, res) => {
   // rewards history
   const rewardsHistoryQuery = await db.query(`
   SELECT
-    r.epoch_no::INTEGER as "forDelegationInEpoch", block.epoch_no as "epochNo",
-    block.time, r.amount::INTEGER, ph.view as "poolId", 'REGULAR' as "rewardType"
+    r.epoch_no::INTEGER as "forDelegationInEpoch",
+    r.amount::INTEGER, ph.view as "poolId", 'REGULAR' as "rewardType"
     FROM reward r
-      LEFT JOIN block ON r.block_id=block.id
       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
       WHERE r.addr_id=$1
-      ORDER BY block.slot_no DESC`,
+      ORDER BY r.epoch_no::INTEGER DESC`,
     [accountDbId]
   )
   const rewardsHistory = rewardsHistoryQuery.rows
