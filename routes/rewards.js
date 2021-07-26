@@ -61,7 +61,7 @@ const calculateAmountWithDescrease = (amount, epoch, rewardsPerEpochs, currentEp
 }
 
 const getEpochData = (data, epoch) => {
-  const arr = data.filter(item => item.epochNo === epoch)
+  const arr = data.filter(item => parseInt(item.epochNo, 10) === epoch)
   return arr.length > 0 ? arr[0] : {}
 }
 
@@ -72,16 +72,17 @@ router.get('/delegation/state', async (req, res) => {
 
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
-      es.epoch_no::BIGINT as "forDelegationInEpoch", block.epoch_no as "epochNo",
-      block.time, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      es.epoch_no::BIGINT as "epochNo",
+      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
       FROM epoch_stake es
-        LEFT JOIN block ON es.block_id=block.id
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
         WHERE ph.view = ANY ($1)
-        ORDER BY block.slot_no DESC
+        ORDER BY es.epoch_no DESC
     `,
     [pools]
   )
+
+  console.log(rewardsHistoryForEpochs)
 
   const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, amount }) => {
     acc[epochNo] = {
@@ -90,6 +91,8 @@ router.get('/delegation/state', async (req, res) => {
     }
     return acc
   }, {}))
+
+  console.log(rewardsPerEpochs)
 
 
   const decreaseGraph = {}
@@ -104,6 +107,8 @@ router.get('/delegation/state', async (req, res) => {
       [epoch]: maxRewards,
     }
   })
+
+  console.log(epochsRange)
 
   let maxLimit = 0
   const distributed = epochsRange
@@ -121,6 +126,8 @@ router.get('/delegation/state', async (req, res) => {
         maxRewards: !exceed ? decreaseGraph[epoch] : 0,
       }
     })
+
+  console.log(distributed)
 
   const totalAccrued = distributed.reduce((n, { xray }) => n + xray, 0)
   const totalUndelivered = totalRewards - totalAccrued
@@ -159,25 +166,23 @@ router.get('/delegation/state/:search', async (req, res) => {
 
   const { rows: rewardsHistoryForAccount } = await db.query(`
     SELECT
-      es.epoch_no::BIGINT as "forDelegationInEpoch",
-      block.time, block.id, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      es.epoch_no::BIGINT as "epochNo",
+      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
       FROM epoch_stake es
-        LEFT JOIN block ON es.block_id=block.id
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
         WHERE ph.view = ANY ($1) AND es.addr_id=$2
-        ORDER BY block.slot_no DESC`,
+        ORDER BY es.epoch_no::BIGINT DESC`,
     [pools, accountDbId]
   )
 
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
-      es.epoch_no::BIGINT as "forDelegationInEpoch", block.epoch_no as "epochNo",
-      block.time, es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      es.epoch_no::BIGINT as "epochNo",
+      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
       FROM epoch_stake es
-        LEFT JOIN block ON es.block_id=block.id
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
         WHERE ph.view = ANY ($1)
-        ORDER BY block.slot_no DESC
+        ORDER BY es.epoch_no::BIGINT DESC
     `,
     [pools]
   )
@@ -216,7 +221,7 @@ router.get('/delegation/state/:search', async (req, res) => {
   })
 
   const rewardsHistory = rewardsHistoryForAccount.map(item => {
-    const epoch = parseInt(item.forDelegationInEpoch, 10)
+    const epoch = parseInt(item.epochNo, 10)
     const tokens = calculateAmountWithDescrease(parseInt(item.amount, 10), epoch, rewardsPerEpochs, currentEpoch)
     const isAvailable = xrayDistributed[epoch].xrayTotal < totalRewards
 
@@ -235,7 +240,7 @@ router.get('/delegation/state/:search', async (req, res) => {
     .filter(distr => distr.epoch <= cutoffEpochEarly)
     .reduce((n, { xray }) => n + xray, 0)
   const totalInEarly = rewardsHistory
-    .filter(distr => parseInt(distr.forDelegationInEpoch, 10) <= cutoffEpochEarly)
+    .filter(distr => parseInt(distr.epochNo, 10) <= cutoffEpochEarly)
     .reduce((n, { amount }) => n + amount, 0)
 
   const totalEarlyBonus = Math.floor(totalInEarly / totalAccruedInEarly * earlyBonus)
