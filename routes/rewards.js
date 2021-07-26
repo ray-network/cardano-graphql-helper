@@ -13,6 +13,7 @@ module.exports = router
 
 // const startEpoch = 100
 // const cutoffEpoch = 130
+// const cutoffEpochEarly = 132
 // const endEpoch = 500
 
 const pools = [
