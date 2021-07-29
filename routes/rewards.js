@@ -74,27 +74,26 @@ router.get('/delegation/state', async (req, res) => {
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
       es.epoch_no::BIGINT as "epochNo",
-      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      e.start_time as "timeStart", e.end_time as "timeEnd"
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
+        LEFT JOIN epoch e ON es.epoch_no=e.no
         WHERE ph.view = ANY ($1)
         ORDER BY es.epoch_no DESC
     `,
     [pools]
   )
 
-  console.log(rewardsHistoryForEpochs)
-
-  const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, amount }) => {
+  const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, timeStart, timeEnd, amount }) => {
     acc[epochNo] = {
       epochNo,
+      timeStart,
+      timeEnd,
       amount: (acc[epochNo] ? parseInt(acc[epochNo].amount) : 0) + parseInt(amount)
     }
     return acc
   }, {}))
-
-  console.log(rewardsPerEpochs)
-
 
   const decreaseGraph = {}
   epochsRange.forEach(epoch => {
@@ -109,8 +108,6 @@ router.get('/delegation/state', async (req, res) => {
     }
   })
 
-  console.log(epochsRange)
-
   let maxLimit = 0
   const distributed = epochsRange
     .map(epoch => {
@@ -120,15 +117,15 @@ router.get('/delegation/state', async (req, res) => {
       const exceed = maxLimit > totalRewards
 
       return {
-        epoch: epoch,
+        epoch,
+        timeStart: distr.timeStart,
+        timeEnd: distr.timeEnd,
         total: !exceed ? distr.amount || 0 : 0,
         xray: !exceed ? rewards[0] || 0 : 0,
         rate: !exceed ? rewards[1] || 0 : 0,
         maxRewards: !exceed ? decreaseGraph[epoch] : 0,
       }
     })
-
-  console.log(distributed)
 
   const totalAccrued = distributed.reduce((n, { xray }) => n + xray, 0)
   const totalUndelivered = totalRewards - totalAccrued
@@ -168,9 +165,11 @@ router.get('/delegation/state/:search', async (req, res) => {
   const { rows: rewardsHistoryForAccount } = await db.query(`
     SELECT
       es.epoch_no::BIGINT as "epochNo",
-      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      e.start_time as "timeStart", e.end_time as "timeEnd"
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
+        LEFT JOIN epoch e ON es.epoch_no=e.no
         WHERE ph.view = ANY ($1) AND es.addr_id=$2
         ORDER BY es.epoch_no::BIGINT DESC`,
     [pools, accountDbId]
@@ -179,18 +178,22 @@ router.get('/delegation/state/:search', async (req, res) => {
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
       es.epoch_no::BIGINT as "epochNo",
-      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType"
+      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      e.start_time as "timeStart", e.end_time as "timeEnd"
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
+        LEFT JOIN epoch e ON es.epoch_no=e.no
         WHERE ph.view = ANY ($1)
         ORDER BY es.epoch_no::BIGINT DESC
     `,
     [pools]
   )
 
-  const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, amount }) => {
+  const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, timeStart, timeEnd, amount }) => {
     acc[epochNo] = {
       epochNo,
+      timeStart,
+      timeEnd,
       amount: (acc[epochNo] ? parseInt(acc[epochNo].amount, 10) : 0) + parseInt(amount, 10)
     }
     return acc
@@ -207,6 +210,8 @@ router.get('/delegation/state/:search', async (req, res) => {
 
       distributed.push({
         epoch: epoch,
+        timeStart: distr.timeStart,
+        timeEnd: distr.timeEnd,
         total: distr.amount || 0,
         xray: rewards[0] || 0,
         rate: rewards[1] || 0,

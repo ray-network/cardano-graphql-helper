@@ -40,10 +40,12 @@ router.get('/state/:stakeKey', async (req, res) => {
   // rewards history
   const rewardsHistoryQuery = await db.query(`
   SELECT
-    r.epoch_no::INTEGER as "forDelegationInEpoch",
-    r.amount::INTEGER, ph.view as "poolId", 'REGULAR' as "rewardType"
+    r.epoch_no::INTEGER as "epochNo",
+    r.amount::INTEGER, ph.view as "poolId", 'REGULAR' as "rewardType",
+    e.start_time as "timeStart", e.end_time as "timeEnd"
     FROM reward r
       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
+      LEFT JOIN epoch e ON r.epoch_no=e.no
       WHERE r.addr_id=$1
       ORDER BY r.epoch_no::INTEGER DESC`,
     [accountDbId]
@@ -117,7 +119,7 @@ router.get('/state/:stakeKey', async (req, res) => {
     const firstDelegationEpochWithRewards = 209
     const diff = epoch - firstDelegationEpochWithRewards - 2
     return {
-      forEpoch: epoch,
+      epochNo: epoch,
       rewardDate: moment.utc('2020-08-23 21:44:00').add(diff * 5, 'days').format(),
       poolId,
     }
@@ -142,10 +144,10 @@ router.get('/state/:stakeKey', async (req, res) => {
     let j = 0
     const paddedEpochRewards = range(currentlyRewardedEpoch, currentlyRewardedEpoch + 4)
       .map(epoch => {
-        if (j < epochRewards.length && epochRewards[j].forEpoch === epoch) {
+        if (j < epochRewards.length && epochRewards[j].epochNo === epoch) {
           return epochRewards[j++]
         }
-        if (j === 0) { return { forEpoch: epoch } }
+        if (j === 0) { return { epochNo: epoch } }
         return getRewardObject(epoch, epochRewards[j - 1].poolId)
       })
     return paddedEpochRewards
