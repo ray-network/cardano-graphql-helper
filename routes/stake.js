@@ -9,6 +9,10 @@ module.exports = router
 router.get('/state/:stakeKey', async (req, res) => {
   const { stakeKey } = req.params
 
+  // current epoch
+  const currentEpochQuery = await db.query(`SELECT no FROM epoch ORDER BY no desc limit 1`)
+  const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
+
   // accountDbId
   const { rows: accountDbResult } = await db.query(
     'SELECT id as "accountDbId" from stake_address WHERE view=$1',
@@ -21,7 +25,7 @@ router.get('/state/:stakeKey', async (req, res) => {
       SELECT 
         (SELECT COALESCE(SUM(rewards.amount), 0) FROM 
           (
-            SELECT amount FROM reward WHERE addr_id=$1
+            SELECT amount FROM reward WHERE addr_id=$1 AND NOT epoch_no = $2 - 1
             UNION ALL
             SELECT amount FROM reserve WHERE addr_id=$1
             UNION ALL
@@ -32,7 +36,7 @@ router.get('/state/:stakeKey', async (req, res) => {
         )
       AS "remainingRewards"
     `,
-    [accountDbId]
+    [accountDbId, currentEpoch]
   )
 
   const rewardsAmount = rewardsAmountQuery.rows.length > 0 ? parseInt(rewardsAmountQuery.rows[0].remainingRewards, 10) : 0
@@ -46,11 +50,15 @@ router.get('/state/:stakeKey', async (req, res) => {
     FROM reward r
       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
       LEFT JOIN epoch e ON r.epoch_no=e.no
-      WHERE r.addr_id=$1
+      WHERE r.addr_id=$1 AND NOT epoch_no = $2 - 1
       ORDER BY r.epoch_no::INTEGER DESC`,
-    [accountDbId]
+    [accountDbId, currentEpoch]
   )
   const rewardsHistory = rewardsHistoryQuery.rows
+
+  console.log(currentEpoch)
+  // console.log(rewardsAmount)
+  // console.log(rewardsHistory)
 
   // current pool
   const currentPoolQuery = await db.query(
@@ -90,10 +98,6 @@ router.get('/state/:stakeKey', async (req, res) => {
   const latestDeregistrationBlock = deregistrationBlockResult.rows.length
     ? parseInt(deregistrationBlockResult.rows[0].blockId, 10) : -1
   const hasStakingKey = latestRegistrationBlock > latestDeregistrationBlock
-
-  // current epoch
-  const currentEpochQuery = await db.query(`SELECT no FROM epoch ORDER BY no desc limit 1`)
-  const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
 
   // next rewards
   const getEmptyRewardsArray = (currentEpoch) =>
