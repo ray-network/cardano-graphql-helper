@@ -79,10 +79,10 @@ router.get('/delegation/state', async (req, res) => {
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
         LEFT JOIN epoch e ON es.epoch_no=e.no
-        WHERE ph.view = ANY ($1) AND NOT epoch_no = ANY ($2)
+        WHERE ph.view = ANY ($1)
         ORDER BY es.epoch_no DESC
     `,
-    [pools, [currentEpoch, currentEpoch - 1]]
+    [pools]
   )
 
   const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, timeStart, timeEnd, amount }) => {
@@ -170,9 +170,9 @@ router.get('/delegation/state/:search', async (req, res) => {
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
         LEFT JOIN epoch e ON es.epoch_no=e.no
-        WHERE ph.view = ANY ($1) AND es.addr_id=$2 AND NOT epoch_no = ANY ($3)
+        WHERE ph.view = ANY ($1) AND es.addr_id=$2
         ORDER BY es.epoch_no::BIGINT DESC`,
-    [pools, accountDbId, [currentEpoch, currentEpoch - 1]]
+    [pools, accountDbId]
   )
 
   console.log(rewardsHistoryForAccount)
@@ -185,15 +185,11 @@ router.get('/delegation/state/:search', async (req, res) => {
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
         LEFT JOIN epoch e ON es.epoch_no=e.no
-        WHERE ph.view = ANY ($1) AND NOT epoch_no = ANY ($2)
+        WHERE ph.view = ANY ($1)
         ORDER BY es.epoch_no::BIGINT DESC
     `,
-    [pools, [currentEpoch, currentEpoch - 1]]
+    [pools]
   )
-
-  console.log('======================================')
-  console.log(currentEpoch)
-  console.log(rewardsHistoryForAccount)
 
   const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, timeStart, timeEnd, amount }) => {
     acc[epochNo] = {
