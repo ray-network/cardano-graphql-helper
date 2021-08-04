@@ -56,10 +56,6 @@ router.get('/state/:stakeKey', async (req, res) => {
   )
   const rewardsHistory = rewardsHistoryQuery.rows
 
-  console.log(currentEpoch)
-  // console.log(rewardsAmount)
-  // console.log(rewardsHistory)
-
   // current pool
   const currentPoolQuery = await db.query(
     `SELECT
