@@ -85,20 +85,6 @@ router.get('/delegation/state', async (req, res) => {
     [pools]
   )
 
-  // const { rows: adaRewardsInCurrentEpoch } = await db.query(`
-  //   SELECT
-  //     r.epoch_no::BIGINT as "epochNo", r.amount
-  //     FROM reward r
-  //       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
-  //       WHERE ph.view = ANY ($1) AND r.epoch_no = $2
-  //   `,
-  //   [pools, currentEpoch - 2]
-  // )
-
-  // const adaInEpoch = adaRewardsInCurrentEpoch.reduce((acc, { amount }) => acc + parseInt(amount, 10), 0)
-  // console.log(adaRewardsInCurrentEpoch.length)
-  // console.log(adaInEpoch)
-
   const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, timeStart, timeEnd, amount }) => {
     acc[epochNo] = {
       epochNo,
@@ -145,7 +131,6 @@ router.get('/delegation/state', async (req, res) => {
   const totalUndelivered = totalRewards - totalAccrued
 
   res.send({
-    hello: 'world',
     currentEpoch,
     totalAccrued,
     totalUndelivered,
