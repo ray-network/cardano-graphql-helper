@@ -85,6 +85,20 @@ router.get('/delegation/state', async (req, res) => {
     [pools]
   )
 
+  // const { rows: adaRewardsInCurrentEpoch } = await db.query(`
+  //   SELECT
+  //     r.epoch_no::BIGINT as "epochNo", r.amount
+  //     FROM reward r
+  //       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
+  //       WHERE ph.view = ANY ($1) AND r.epoch_no = $2
+  //   `,
+  //   [pools, currentEpoch - 2]
+  // )
+
+  // const adaInEpoch = adaRewardsInCurrentEpoch.reduce((acc, { amount }) => acc + parseInt(amount, 10), 0)
+  // console.log(adaRewardsInCurrentEpoch.length)
+  // console.log(adaInEpoch)
+
   const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, timeStart, timeEnd, amount }) => {
     acc[epochNo] = {
       epochNo,
@@ -131,11 +145,44 @@ router.get('/delegation/state', async (req, res) => {
   const totalUndelivered = totalRewards - totalAccrued
 
   res.send({
+    hello: 'world',
     currentEpoch,
     totalAccrued,
     totalUndelivered,
     distributed,
   })
+})
+
+router.get('/search/:search', async (req, res) => {
+  const { search } = req.params
+
+  if (search.startsWith('addr1')) {
+    const { rows: stakeAddressDbResult } = await db.query(
+      `
+        SELECT
+          tx_out.stake_address_id as "id", stake_address.view as "key"
+          FROM tx_out
+            LEFT JOIN stake_address ON tx_out.stake_address_id=stake_address.id
+            WHERE address=$1 limit 1
+      `,
+      [search]
+    )
+    res.send({
+      id: stakeAddressDbResult.length > 0 ? stakeAddressDbResult[0].id : false,
+      key: stakeAddressDbResult.length > 0 ? stakeAddressDbResult[0].key : false,
+    })
+  }
+
+  if (!search.startsWith('addr1')) {
+    const { rows: accountDbResult } = await db.query(
+      'SELECT id as "accountDbId", view as "key" from stake_address WHERE view=$1',
+      [search]
+    )
+    res.send({
+      id: accountDbResult.length > 0 ? accountDbResult[0].accountDbId : false,
+      key: accountDbResult.length > 0 ? accountDbResult[0].key : false,
+    })
+  }
 })
 
 router.get('/delegation/state/:search', async (req, res) => {
@@ -174,8 +221,6 @@ router.get('/delegation/state/:search', async (req, res) => {
         ORDER BY es.epoch_no::BIGINT DESC`,
     [pools, accountDbId]
   )
-
-  console.log(rewardsHistoryForAccount)
 
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
@@ -251,7 +296,7 @@ router.get('/delegation/state/:search', async (req, res) => {
     .filter(distr => parseInt(distr.epochNo, 10) <= cutoffEpochEarly)
     .reduce((n, { amount }) => n + amount, 0)
 
-  const totalEarlyBonus = Math.floor(totalInEarly / totalAccruedInEarly * earlyBonus)
+  const totalEarlyBonus = Math.ceil(totalInEarly / totalAccruedInEarly * earlyBonus / 100)
   const totalEarlyShare = (totalInEarly / totalAccruedInEarly).toFixed(4)
 
   res.send({
