@@ -6,6 +6,10 @@ const moment = require('moment')
 
 module.exports = router
 
+/*
+ * STAKE STATE BY STAKE KEY
+ */
+
 router.get('/state/:stakeKey', async (req, res) => {
   const { stakeKey } = req.params
 
@@ -25,7 +29,7 @@ router.get('/state/:stakeKey', async (req, res) => {
       SELECT 
         (SELECT COALESCE(SUM(rewards.amount), 0) FROM 
           (
-            SELECT amount FROM reward WHERE addr_id=$1
+            SELECT amount FROM reward WHERE addr_id=$1 AND NOT epoch_no = ANY ($2)
             UNION ALL
             SELECT amount FROM reserve WHERE addr_id=$1
             UNION ALL
@@ -36,7 +40,7 @@ router.get('/state/:stakeKey', async (req, res) => {
         )
       AS "remainingRewards"
     `,
-    [accountDbId]
+    [accountDbId, [currentEpoch, currentEpoch - 1]]
   )
 
   const rewardsAmount = rewardsAmountQuery.rows.length > 0 ? parseInt(rewardsAmountQuery.rows[0].remainingRewards, 10) : 0
@@ -50,9 +54,9 @@ router.get('/state/:stakeKey', async (req, res) => {
     FROM reward r
       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
       LEFT JOIN epoch e ON r.epoch_no=e.no
-      WHERE r.addr_id=$1
+      WHERE r.addr_id=$1 AND NOT epoch_no = ANY ($2)
       ORDER BY r.epoch_no::INTEGER DESC`,
-    [accountDbId]
+    [accountDbId, [currentEpoch, currentEpoch - 1]]
   )
   const rewardsHistory = rewardsHistoryQuery.rows
 

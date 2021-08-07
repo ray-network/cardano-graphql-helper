@@ -66,6 +66,10 @@ const getEpochData = (data, epoch) => {
   return arr.length > 0 ? arr[0] : {}
 }
 
+/*
+ * GLOBAL REWARDS STATE
+ */
+
 router.get('/delegation/state', async (req, res) => {
 
   const currentEpochQuery = await db.query('SELECT no FROM epoch ORDER BY no desc limit 1')
@@ -138,6 +142,10 @@ router.get('/delegation/state', async (req, res) => {
   })
 })
 
+/*
+ * SEARCH STAKE KEY BY KEY OR ADDRESS
+ */
+
 router.get('/search/:search', async (req, res) => {
   const { search } = req.params
 
@@ -169,6 +177,10 @@ router.get('/search/:search', async (req, res) => {
     })
   }
 })
+
+/*
+ * REWARDS STATE BY KEY OR ADDRESS
+ */
 
 router.get('/delegation/state/:search', async (req, res) => {
   const { search } = req.params
