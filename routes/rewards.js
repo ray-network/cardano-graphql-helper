@@ -40,7 +40,7 @@ const calculateAmountWithDescrease = (amount, epoch, rewardsPerEpochs, currentEp
   const maxRewardsCalc = parseInt(maxStart - maxStart * decreaseRatio * coeff, 10)
   const maxRewards = maxRewardsCalc > 0 ? maxRewardsCalc : 0
 
-  const fromEpochs = rewardsPerEpochs.filter(item => item.epochNo === epoch)
+  const fromEpochs = rewardsPerEpochs.filter(item => parseInt(item.epochNo) === epoch)
   const fromEpoch = fromEpochs.length > 0 ? fromEpochs[0] : {}
   const fromEpochAmount = fromEpoch.amount || 0
 
@@ -65,6 +65,44 @@ const getEpochData = (data, epoch) => {
   const arr = data.filter(item => parseInt(item.epochNo, 10) === epoch)
   return arr.length > 0 ? arr[0] : {}
 }
+
+
+
+/*
+ * SEARCH STAKE KEY BY KEY OR ADDRESS
+ */
+
+router.get('/search/:search', async (req, res) => {
+  const { search } = req.params
+
+  if (search.startsWith('addr1')) {
+    const { rows: stakeAddressDbResult } = await db.query(
+      `
+        SELECT
+          tx_out.stake_address_id as "id", stake_address.view as "key"
+          FROM tx_out
+            LEFT JOIN stake_address ON tx_out.stake_address_id=stake_address.id
+            WHERE address=$1 limit 1
+      `,
+      [search]
+    )
+    res.send({
+      id: stakeAddressDbResult.length > 0 ? stakeAddressDbResult[0].id : false,
+      key: stakeAddressDbResult.length > 0 ? stakeAddressDbResult[0].key : false,
+    })
+  }
+
+  if (!search.startsWith('addr1')) {
+    const { rows: accountDbResult } = await db.query(
+      'SELECT id as "accountDbId", view as "key" from stake_address WHERE view=$1',
+      [search]
+    )
+    res.send({
+      id: accountDbResult.length > 0 ? accountDbResult[0].accountDbId : false,
+      key: accountDbResult.length > 0 ? accountDbResult[0].key : false,
+    })
+  }
+})
 
 /*
  * GLOBAL REWARDS STATE
@@ -106,10 +144,6 @@ router.get('/delegation/state', async (req, res) => {
     const maxRewardsCalc = parseInt(maxStart - maxStart * decreaseRatio * coeff, 10)
     const maxRewards = maxRewardsCalc > 0 ? maxRewardsCalc : 0
     decreaseGraph[epoch] = maxRewards
-
-    return {
-      [epoch]: maxRewards,
-    }
   })
 
   let maxLimit = 0
@@ -140,42 +174,6 @@ router.get('/delegation/state', async (req, res) => {
     totalUndelivered,
     distributed,
   })
-})
-
-/*
- * SEARCH STAKE KEY BY KEY OR ADDRESS
- */
-
-router.get('/search/:search', async (req, res) => {
-  const { search } = req.params
-
-  if (search.startsWith('addr1')) {
-    const { rows: stakeAddressDbResult } = await db.query(
-      `
-        SELECT
-          tx_out.stake_address_id as "id", stake_address.view as "key"
-          FROM tx_out
-            LEFT JOIN stake_address ON tx_out.stake_address_id=stake_address.id
-            WHERE address=$1 limit 1
-      `,
-      [search]
-    )
-    res.send({
-      id: stakeAddressDbResult.length > 0 ? stakeAddressDbResult[0].id : false,
-      key: stakeAddressDbResult.length > 0 ? stakeAddressDbResult[0].key : false,
-    })
-  }
-
-  if (!search.startsWith('addr1')) {
-    const { rows: accountDbResult } = await db.query(
-      'SELECT id as "accountDbId", view as "key" from stake_address WHERE view=$1',
-      [search]
-    )
-    res.send({
-      id: accountDbResult.length > 0 ? accountDbResult[0].accountDbId : false,
-      key: accountDbResult.length > 0 ? accountDbResult[0].key : false,
-    })
-  }
 })
 
 /*
