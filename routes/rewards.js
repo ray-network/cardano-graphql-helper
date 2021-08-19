@@ -5,16 +5,18 @@ const router = new Router()
 
 module.exports = router
 
-// const pools = [
-//   'pool15sfcpy4tps5073gmra0e6tm2dgtrn004yr437qmeh44sgjlg2ex',
-//   'pool1d03p2xfdcq09efx0hgy4jkr0tqdgvklues5cg3ud45t9wndafmm',
-//   'pool1tzmx7k40sm8kheam3pr2d4yexrp3jmv8l50suj6crnvn6dc2429',
-// ]
+/*
+const pools = [
+  'pool15sfcpy4tps5073gmra0e6tm2dgtrn004yr437qmeh44sgjlg2ex',
+  'pool1d03p2xfdcq09efx0hgy4jkr0tqdgvklues5cg3ud45t9wndafmm',
+  'pool1tzmx7k40sm8kheam3pr2d4yexrp3jmv8l50suj6crnvn6dc2429',
+]
 
-// const startEpoch = 100
-// const cutoffEpoch = 130
-// const cutoffEpochEarly = 132
-// const endEpoch = 500
+const startEpoch = 100
+const cutoffEpoch = 130
+const cutoffEpochEarly = 132
+const endEpoch = 500
+*/
 
 const pools = [
   'pool1rjxdqghfjw5rv6lxg8qhedkechvfgnsqhl8rrzwck9g45n43yql',
@@ -65,8 +67,6 @@ const getEpochData = (data, epoch) => {
   const arr = data.filter(item => parseInt(item.epochNo, 10) === epoch)
   return arr.length > 0 ? arr[0] : {}
 }
-
-
 
 /*
  * SEARCH STAKE KEY BY KEY OR ADDRESS
@@ -173,6 +173,73 @@ router.get('/delegation/state', async (req, res) => {
     totalAccrued,
     totalUndelivered,
     distributed,
+  })
+})
+
+/*
+ * RATE IN THE LAST EPOCH
+ */
+
+router.get('/delegation/rate', async (req, res) => {
+
+  const currentEpochQuery = await db.query('SELECT no FROM epoch ORDER BY no desc limit 1')
+  const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
+
+  const { rows: rewardsHistoryForEpochs } = await db.query(`
+    SELECT
+      es.epoch_no::BIGINT as "epochNo",
+      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      e.start_time as "timeStart", e.end_time as "timeEnd"
+      FROM epoch_stake es
+        LEFT JOIN pool_hash ph ON es.pool_id=ph.id
+        LEFT JOIN epoch e ON es.epoch_no=e.no
+        WHERE ph.view = ANY ($1) AND e.no = $2
+        ORDER BY es.epoch_no DESC
+    `,
+    [pools, currentEpoch]
+  )
+
+  const rewardsPerEpochs = Object.values(rewardsHistoryForEpochs.reduce((acc, { epochNo, timeStart, timeEnd, amount }) => {
+    acc[epochNo] = {
+      epochNo,
+      timeStart,
+      timeEnd,
+      amount: (acc[epochNo] ? parseInt(acc[epochNo].amount) : 0) + parseInt(amount)
+    }
+    return acc
+  }, {}))
+
+  const decreaseGraph = {}
+  epochsRange.forEach(epoch => {
+    const diff = epoch - cutoffEpoch
+    const coeff = diff >= 0 ? diff : 0
+    const maxRewardsCalc = parseInt(maxStart - maxStart * decreaseRatio * coeff, 10)
+    const maxRewards = maxRewardsCalc > 0 ? maxRewardsCalc : 0
+    decreaseGraph[epoch] = maxRewards
+  })
+
+  let maxLimit = 0
+  const distributed = epochsRange
+    .map(epoch => {
+      const distr = getEpochData(rewardsPerEpochs, epoch)
+      const rewards = calculateAmountWithDescrease(distr.amount, epoch, rewardsPerEpochs, currentEpoch)
+      maxLimit = maxLimit + (rewards[0] || 0)
+      const exceed = maxLimit > totalRewards
+
+      return {
+        epoch,
+        timeStart: distr.timeStart,
+        timeEnd: distr.timeEnd,
+        total: !exceed ? distr.amount || 0 : 0,
+        xray: !exceed ? rewards[0] || 0 : 0,
+        rate: !exceed ? rewards[1] || 0 : 0,
+        maxRewards: !exceed ? decreaseGraph[epoch] : 0,
+      }
+    })
+
+  res.send({
+    currentEpoch,
+    rate: distributed.filter((epoch) => epoch.epoch === currentEpoch)[0].rate || 0,
   })
 })
 
