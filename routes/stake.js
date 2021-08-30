@@ -10,7 +10,7 @@ module.exports = router
  * STAKE STATE BY STAKE KEY
  */
 
-router.get('/state/:stakeKey', async (req, res) => {
+router.get('/key/:stakeKey', async (req, res) => {
   const { stakeKey } = req.params
 
   // current epoch
@@ -29,7 +29,7 @@ router.get('/state/:stakeKey', async (req, res) => {
       SELECT 
         (SELECT COALESCE(SUM(rewards.amount), 0) FROM 
           (
-            SELECT amount FROM reward WHERE addr_id=$1 AND NOT epoch_no = ANY ($2)
+            SELECT amount FROM reward WHERE addr_id=$1
             UNION ALL
             SELECT amount FROM reserve WHERE addr_id=$1
             UNION ALL
@@ -40,7 +40,7 @@ router.get('/state/:stakeKey', async (req, res) => {
         )
       AS "remainingRewards"
     `,
-    [accountDbId, [currentEpoch, currentEpoch - 1]]
+    [accountDbId]
   )
 
   const rewardsAmount = rewardsAmountQuery.rows.length > 0 ? parseInt(rewardsAmountQuery.rows[0].remainingRewards, 10) : 0
@@ -48,15 +48,15 @@ router.get('/state/:stakeKey', async (req, res) => {
   // rewards history
   const rewardsHistoryQuery = await db.query(`
   SELECT
-    r.epoch_no::INTEGER as "epochNo",
+    r.spendable_epoch::INTEGER as "epochNo",
     r.amount::INTEGER, ph.view as "poolId", 'REGULAR' as "rewardType",
     e.start_time as "timeStart", e.end_time as "timeEnd"
     FROM reward r
       LEFT JOIN pool_hash ph ON r.pool_id=ph.id
-      LEFT JOIN epoch e ON r.epoch_no=e.no
-      WHERE r.addr_id=$1 AND NOT epoch_no = ANY ($2)
-      ORDER BY r.epoch_no::INTEGER DESC`,
-    [accountDbId, [currentEpoch, currentEpoch - 1]]
+      LEFT JOIN epoch e ON r.spendable_epoch=e.no
+      WHERE r.addr_id=$1
+      ORDER BY r.spendable_epoch::INTEGER DESC`,
+    [accountDbId]
   )
   const rewardsHistory = rewardsHistoryQuery.rows
 

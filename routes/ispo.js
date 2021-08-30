@@ -105,10 +105,10 @@ router.get('/search/:search', async (req, res) => {
 })
 
 /*
- * GLOBAL REWARDS STATE
+ * GLOBAL ISPO STATE
  */
 
-router.get('/delegation/state', async (req, res) => {
+router.get('/state', async (req, res) => {
 
   const currentEpochQuery = await db.query('SELECT no FROM epoch ORDER BY no desc limit 1')
   const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
@@ -116,7 +116,7 @@ router.get('/delegation/state', async (req, res) => {
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
       es.epoch_no::BIGINT as "epochNo",
-      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      es.amount::BIGINT, ph.view as "poolId", 'ISPO' as "rewardType",
       e.start_time as "timeStart", e.end_time as "timeEnd"
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
@@ -180,7 +180,7 @@ router.get('/delegation/state', async (req, res) => {
  * RATE IN THE LAST EPOCH
  */
 
-router.get('/delegation/rate', async (req, res) => {
+router.get('/rate', async (req, res) => {
 
   const currentEpochQuery = await db.query('SELECT no FROM epoch ORDER BY no desc limit 1')
   const currentEpoch = currentEpochQuery.rows.length > 0 ? parseInt(currentEpochQuery.rows[0].no, 10) : 0
@@ -188,7 +188,7 @@ router.get('/delegation/rate', async (req, res) => {
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
       es.epoch_no::BIGINT as "epochNo",
-      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      es.amount::BIGINT, ph.view as "poolId", 'ISPO' as "rewardType",
       e.start_time as "timeStart", e.end_time as "timeEnd"
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
@@ -247,7 +247,7 @@ router.get('/delegation/rate', async (req, res) => {
  * REWARDS STATE BY KEY OR ADDRESS
  */
 
-router.get('/delegation/state/:search', async (req, res) => {
+router.get('/key/:search', async (req, res) => {
   const { search } = req.params
 
   // accountDbId
@@ -274,7 +274,7 @@ router.get('/delegation/state/:search', async (req, res) => {
   const { rows: rewardsHistoryForAccount } = await db.query(`
     SELECT
       es.epoch_no::BIGINT as "epochNo",
-      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      es.amount::BIGINT, ph.view as "poolId", 'ISPO' as "rewardType",
       e.start_time as "timeStart", e.end_time as "timeEnd"
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
@@ -287,7 +287,7 @@ router.get('/delegation/state/:search', async (req, res) => {
   const { rows: rewardsHistoryForEpochs } = await db.query(`
     SELECT
       es.epoch_no::BIGINT as "epochNo",
-      es.amount::BIGINT, ph.view as "poolId", 'REGULAR' as "rewardType",
+      es.amount::BIGINT, ph.view as "poolId", 'ISPO' as "rewardType",
       e.start_time as "timeStart", e.end_time as "timeEnd"
       FROM epoch_stake es
         LEFT JOIN pool_hash ph ON es.pool_id=ph.id
