@@ -1,3 +1,7 @@
+```
+Deprecated
+```
+
 ### cardano-graphql-helper
 
 Some cardano-graphql queries are slow or incorrect, this proxy API complements the functionality.
